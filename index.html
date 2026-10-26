@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="id">
 <head>
+<base target="_top">
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Interpreter Booth</title>
@@ -124,7 +125,7 @@ th{opacity:.7;font-weight:700}
     <div class="logo"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#10243a" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 14v-2a8 8 0 0 1 16 0v2"/><rect x="2.5" y="14" width="4.5" height="6" rx="2"/><rect x="17" y="14" width="4.5" height="6" rx="2"/><path d="M19 20c0 1.5-2 2-5 2"/></svg></div>
     <h1>Interpreter Booth<small>Latihan interpreting • Indonesia ⇄ English</small></h1>
     <span class="sp"></span>
-    <button class="ibtn" id="btnLogout" style="display:none" onclick="logout()">⎋ Keluar</button>
+    <button class="ibtn" id="btnLogout" style="display:none" onclick="askLogout()" aria-label="Logout">⎋ Logout</button>
     <button class="ibtn" onclick="openAdmin()" aria-label="Panel dosen">🛡️ Dosen</button>
   </header>
 
@@ -176,6 +177,7 @@ th{opacity:.7;font-weight:700}
         <button class="ibtn" onclick="fs(-1)" aria-label="Perkecil huruf">A−</button>
         <button class="ibtn" onclick="fs(1)" aria-label="Perbesar huruf">A+</button>
         <span class="sp"></span>
+        <button class="ibtn" onclick="askLogout()">⎋ Logout</button>
         <button class="btn teal" id="bDone" style="width:auto;margin:0" onclick="doFinish()">✔ Saya selesai</button>
       </div>
       <p class="note" id="doneNote"></p>
@@ -209,15 +211,7 @@ function ask(o){return new Promise(res=>{
   document.addEventListener('keydown',key);d.classList.add('on');$('dOk').focus();
 })}
 const $=id=>document.getElementById(id);
-const API='https://script.google.com/macros/s/AKfycbyK62UmEE_0L6kpKYJUxjUa8f8rOcDOhvLD3Oyj2vtWP3DqfkpdQTfQGd7QlcmPsKgWTQ/exec';
-const run=async(fn,...args)=>{
-  let res;
-  try{res=await fetch(API,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({fn,args}),redirect:'follow'})}
-  catch(e){throw new Error('Tidak dapat terhubung ke server. Periksa koneksi internet lalu coba lagi.')}
-  let j;try{j=await res.json()}catch(e){throw new Error('Respons server tidak valid. Pastikan deployment Apps Script sudah versi terbaru dan akses diatur ke "Anyone".')}
-  if(!j.ok)throw new Error(j.error||'Terjadi kesalahan.');
-  return j.data;
-};
+const run=(fn,...a)=>new Promise((ok,no)=>google.script.run.withSuccessHandler(ok).withFailureHandler(e=>no(new Error((e&&e.message||String(e)).replace(/^Error:\s*/,'')))) [fn](...a));
 let ME=null, FS=1.1;
 const show=n=>{document.querySelectorAll('.screen').forEach(s=>s.classList.remove('on'));$('s-'+n).classList.add('on');$('btnLogout').style.display=n==='login'?'none':'inline-flex';window.scrollTo({top:0,behavior:'smooth'})};
 const toast=m=>{const t=$('toast');t.textContent=m;t.classList.add('on');setTimeout(()=>t.classList.remove('on'),2600)};
@@ -241,7 +235,7 @@ function spinTo(el,box,list,final,ms){
 }
 async function doDraw(){
   $('eDraw').textContent='';const b=$('bDraw');b.disabled=true;b.textContent='Mengacak…';
-  const ids=[1,2,3,4,5,6,7].map(n=>'ID-0'+n),ens=[1,2,3,4,5,6,7].map(n=>'EN-0'+n);
+  const mk=p=>Array.from({length:15},(_,i)=>p+'-'+String(i+1).padStart(2,'0')),ids=mk('ID'),ens=mk('EN');
   try{
     const [r]=await Promise.all([run('draw',ME.nim),new Promise(r=>setTimeout(r,600))]);
     ME=r;
@@ -263,6 +257,10 @@ async function doFinish(){
   try{await run('finish',ME.nim);ME.done=true;setDone(true);toast('Tercatat selesai ✔');confetti()}catch(e){toast(e.message)}
 }
 function fs(d){FS=Math.min(1.7,Math.max(.9,FS+d*.1));document.querySelectorAll('.body').forEach(b=>b.style.setProperty('--fs',FS+'rem'))}
+async function askLogout(){
+  const m=ME&&ME.drawn?'Teks kamu tetap tersimpan. Login lagi dengan NIM yang sama untuk melihatnya kembali. Timer latihan akan direset.':'Kamu belum mengacak teks. Kamu bisa login kembali kapan saja.';
+  if(await ask({icon:'👋',title:'Keluar dari booth?',msg:m,ok:'Ya, keluar',no:'Tetap di sini'})){logout();toast('Berhasil keluar')}
+}
 function logout(){store.clear();ME=null;stopAll();$('nama').value='';$('nim').value='';show('login')}
 
 /* timers */
@@ -291,7 +289,7 @@ async function loadAdmin(){
     b.innerHTML=`<p class="sub" style="margin:12px 0 0">${d.rows.length} peserta terdaftar • ${d.rows.filter(r=>r.id).length} sudah mengacak</p>
     <table><tr><th>Nama</th><th>NIM</th><th>Indonesia</th><th>Inggris</th><th>Selesai</th><th></th></tr>${rows||'<tr><td colspan="6">Belum ada peserta.</td></tr>'}</table>
     <div class="tools"><button class="ibtn" onclick="loadAdmin()">⟳ Segarkan</button><button class="ibtn" onclick="resetAll()" style="color:#ffb4ab">Hapus semua data</button></div>
-    <h3 style="margin-top:22px">Kunci teks (14)</h3><table>${d.texts.map(t=>`<tr><td><span class="tag ${t.code.slice(0,2).toLowerCase()}">${t.code}</span></td><td>${esc(t.topic)}</td><td style="opacity:.8">${esc(t.text.slice(0,90))}…</td></tr>`).join('')}</table>`;
+    <h3 style="margin-top:22px">Kunci teks (${d.texts.length})</h3><table>${d.texts.map(t=>`<tr><td><span class="tag ${t.code.slice(0,2).toLowerCase()}">${t.code}</span></td><td>${esc(t.topic)}</td><td style="opacity:.8">${esc(t.text.slice(0,90))}…</td></tr>`).join('')}</table>`;
   }catch(e){PIN='';$('eAdm').textContent=e.message}
 }
 async function resetOne(n){if(await ask({icon:'🗑️',danger:true,title:'Reset peserta ini?',msg:'Data NIM '+n+' akan dihapus. Peserta bisa login dan mengacak ulang.',ok:'Ya, reset'})){try{await run('adminReset',PIN,n);toast('Data direset');loadAdmin()}catch(e){toast(e.message)}}}
