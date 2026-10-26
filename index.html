@@ -1,7 +1,6 @@
 <!DOCTYPE html>
 <html lang="id">
 <head>
-<base target="_top">
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Interpreter Booth</title>
@@ -211,7 +210,15 @@ function ask(o){return new Promise(res=>{
   document.addEventListener('keydown',key);d.classList.add('on');$('dOk').focus();
 })}
 const $=id=>document.getElementById(id);
-const run=(fn,...a)=>new Promise((ok,no)=>google.script.run.withSuccessHandler(ok).withFailureHandler(e=>no(new Error((e&&e.message||String(e)).replace(/^Error:\s*/,'')))) [fn](...a));
+const API='https://script.google.com/macros/s/AKfycbyK62UmEE_0L6kpKYJUxjUa8f8rOcDOhvLD3Oyj2vtWP3DqfkpdQTfQGd7QlcmPsKgWTQ/exec';
+const run=async(fn,...args)=>{
+  let res;
+  try{res=await fetch(API,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({fn,args}),redirect:'follow'})}
+  catch(e){throw new Error('Tidak dapat terhubung ke server. Periksa koneksi internet lalu coba lagi.')}
+  let j;try{j=await res.json()}catch(e){throw new Error('Respons server tidak valid. Pastikan deployment Apps Script sudah versi terbaru dan akses diatur ke "Anyone".')}
+  if(!j.ok)throw new Error(j.error||'Terjadi kesalahan.');
+  return j.data;
+};
 let ME=null, FS=1.1;
 const show=n=>{document.querySelectorAll('.screen').forEach(s=>s.classList.remove('on'));$('s-'+n).classList.add('on');$('btnLogout').style.display=n==='login'?'none':'inline-flex';window.scrollTo({top:0,behavior:'smooth'})};
 const toast=m=>{const t=$('toast');t.textContent=m;t.classList.add('on');setTimeout(()=>t.classList.remove('on'),2600)};
